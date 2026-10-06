@@ -3,11 +3,14 @@ package main
 import (
 	"log"
 
+	"eticket-go/app/service"
 	"eticket-go/config"
 )
 
 func main() {
-	app := config.NewApp()
+	eventService := service.NewEventService()
+
+	app := config.NewApp(eventService)
 
 	log.Fatal(app.Listen(":3000"))
 }
