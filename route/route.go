@@ -19,4 +19,6 @@ func Register(app *fiber.App, eventService *service.EventService) {
 	api.Get("/events/:id", eventService.Get)
 
 	api.Post("/events", eventService.Create)
+
+	api.Put("/events/:id", eventService.Replace)
 }
