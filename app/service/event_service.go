@@ -162,3 +162,23 @@ func (s *EventService) Replace(c *fiber.Ctx) error {
 
 	return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
 }
+
+func (s *EventService) Delete(c *fiber.Ctx) error {
+	rawID := c.Params("id")
+
+	id, err := strconv.Atoi(rawID)
+
+	if err != nil {
+		return helper.Fail(c, fiber.StatusBadRequest, "id harus berupa angka")
+	}
+
+	for i, event := range s.events {
+		if event.ID == id {
+			s.events = append(s.events[:i], s.events[i+1:]...)
+
+			return helper.NoContent(c)
+		}
+	}
+
+	return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
+}

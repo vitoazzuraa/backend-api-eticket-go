@@ -21,4 +21,6 @@ func Register(app *fiber.App, eventService *service.EventService) {
 	api.Post("/events", eventService.Create)
 
 	api.Put("/events/:id", eventService.Replace)
+
+	api.Delete("/events/:id", eventService.Delete)
 }

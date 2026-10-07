@@ -38,3 +38,7 @@ func Created(c *fiber.Ctx, message string, data any, location string) error {
 		Data:    data,
 	})
 }
+
+func NoContent(c *fiber.Ctx) error {
+	return c.SendStatus(fiber.StatusNoContent)
+}
