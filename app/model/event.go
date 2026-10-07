@@ -26,3 +26,11 @@ type ReplaceEventRequest struct {
 	Price     int       `json:"price"`
 	Quota     int       `json:"quota"`
 }
+
+type PatchEventRequest struct {
+	Name      *string    `json:"name,omitempty"`
+	Venue     *string    `json:"venue,omitempty"`
+	EventDate *time.Time `json:"event_date,omitempty"`
+	Price     *int       `json:"price,omitempty"`
+	Quota     *int       `json:"quota,omitempty"`
+}

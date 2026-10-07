@@ -182,3 +182,63 @@ func (s *EventService) Delete(c *fiber.Ctx) error {
 
 	return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
 }
+
+func (s *EventService) Patch(c *fiber.Ctx) error {
+	rawID := c.Params("id")
+
+	id, err := strconv.Atoi(rawID)
+
+	if err != nil {
+		return helper.Fail(c, fiber.StatusBadRequest, "id harus berupa angka")
+	}
+
+	var req model.PatchEventRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return helper.Fail(c, fiber.StatusBadRequest, "body harus berupa JSON yang valid")
+	}
+
+	if req.Name == nil && req.Venue == nil && req.EventDate == nil && req.Price == nil && req.Quota == nil {
+		return helper.Fail(c, fiber.StatusBadRequest, "tidak ada field yang diubah")
+	}
+
+	for i, event := range s.events {
+		if event.ID == id {
+			current := s.events[i]
+
+			if req.Name != nil {
+				current.Name = *req.Name
+			}
+			if req.Venue != nil {
+				current.Venue = *req.Venue
+			}
+			if req.EventDate != nil {
+				current.EventDate = *req.EventDate
+			}
+			if req.Price != nil {
+				if *req.Price <= 0 {
+					return helper.FailValidation(c, map[string]string{
+						"price": "harga harus lebih dari 0",
+					})
+				}
+
+				current.Price = *req.Price
+			}
+			if req.Quota != nil {
+				if *req.Quota <= 0 {
+					return helper.FailValidation(c, map[string]string{
+						"quota": "kuota harus lebih dari 0",
+					})
+				}
+
+				current.Quota = *req.Quota
+			}
+
+			s.events[i] = current
+
+			return helper.Success(c, fiber.StatusOK, "event berhasil diubah", current)
+		}
+	}
+
+	return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
+}
