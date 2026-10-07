@@ -58,3 +58,53 @@ func (s *EventService) Get(c *fiber.Ctx) error {
 
 	return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
 }
+
+func (s *EventService) Create(c *fiber.Ctx) error {
+	var req model.CreateEventRequest
+
+	if err := c.BodyParser(&req); err != nil {
+		return helper.Fail(c, fiber.StatusBadRequest, "body harus berupa JSON yang valid")
+	}
+
+	errs := map[string]string{}
+
+	if req.Name == "" {
+		errs["name"] = "nama wajib diisi"
+	}
+	if req.Venue == "" {
+		errs["venue"] = "venue wajib diisi"
+	}
+	if req.Price <= 0 {
+		errs["price"] = "harga harus lebih dari 0"
+	}
+	if req.Quota <= 0 {
+		errs["quota"] = "kuota harus lebih dari 0"
+	}
+
+	if len(errs) > 0 {
+		return helper.FailValidation(c, errs)
+	}
+
+	maxID := 0
+
+	for _, event := range s.events {
+		if event.ID > maxID {
+			maxID = event.ID
+		}
+	}
+
+	maxID += 1
+
+	event := model.Event{
+		ID:        maxID,
+		Name:      req.Name,
+		Venue:     req.Venue,
+		EventDate: req.EventDate,
+		Price:     req.Price,
+		Quota:     req.Quota,
+	}
+
+	s.events = append(s.events, event)
+
+	return helper.Created(c, "event berhasil dibuat", event, "/api/v1/events/"+strconv.Itoa(event.ID))
+}
