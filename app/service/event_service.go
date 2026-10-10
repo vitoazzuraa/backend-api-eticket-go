@@ -66,22 +66,7 @@ func (s *EventService) Create(c *fiber.Ctx) error {
 		return helper.Fail(c, fiber.StatusBadRequest, "body harus berupa JSON yang valid")
 	}
 
-	errs := map[string]string{}
-
-	if req.Name == "" {
-		errs["name"] = "nama wajib diisi"
-	}
-	if req.Venue == "" {
-		errs["venue"] = "venue wajib diisi"
-	}
-	if req.Price <= 0 {
-		errs["price"] = "harga harus lebih dari 0"
-	}
-	if req.Quota <= 0 {
-		errs["quota"] = "kuota harus lebih dari 0"
-	}
-
-	if len(errs) > 0 {
+	if errs := ValidateEvent(req.Name, req.Venue, req.Price, req.Quota); len(errs) > 0 {
 		return helper.FailValidation(c, errs)
 	}
 
@@ -124,22 +109,7 @@ func (s *EventService) Replace(c *fiber.Ctx) error {
 		return helper.Fail(c, fiber.StatusBadRequest, "body harus berupa JSON yang valid")
 	}
 
-	errs := map[string]string{}
-
-	if req.Name == "" {
-		errs["name"] = "nama wajib diisi"
-	}
-	if req.Venue == "" {
-		errs["venue"] = "venue wajib diisi"
-	}
-	if req.Price <= 0 {
-		errs["price"] = "harga harus lebih dari 0"
-	}
-	if req.Quota <= 0 {
-		errs["quota"] = "kuota harus lebih dari 0"
-	}
-
-	if len(errs) > 0 {
+	if errs := ValidateEvent(req.Name, req.Venue, req.Price, req.Quota); len(errs) > 0 {
 		return helper.FailValidation(c, errs)
 	}
 
