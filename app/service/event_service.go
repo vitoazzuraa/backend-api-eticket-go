@@ -1,47 +1,43 @@
 package service
 
 import (
+	"errors"
 	"strconv"
-	"time"
 
 	"eticket-go/app/model"
+	"eticket-go/app/repository"
 	"eticket-go/helper"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 type EventService struct {
-	events []model.Event
+	repo repository.EventRepository
 }
 
-func NewEventService() *EventService {
-	return &EventService{
-		events: []model.Event{
-			{
-				ID:        1,
-				Name:      "Comifuro",
-				Venue:     "Stage 1",
-				EventDate: time.Date(2026, 9, 1, 19, 0, 0, 0, time.UTC),
-				Price:     20000,
-				Quota:     100,
-			},
-			{
-				ID:        2,
-				Name:      "Festival Musik",
-				Venue:     "Stage 2",
-				EventDate: time.Date(2026, 9, 1, 20, 0, 0, 0, time.UTC),
-				Price:     10000,
-				Quota:     100,
-			},
-		},
-	}
+func NewEventService(repo repository.EventRepository) *EventService {
+	return &EventService{repo: repo}
 }
 
 func (s *EventService) List(c *fiber.Ctx) error {
-	return helper.Success(c, fiber.StatusOK, "daftar event berhasil diambil", s.events)
+	ctx, cancel := helper.RequestContext(c)
+
+	defer cancel()
+
+	events, err := s.repo.FindAll(ctx)
+
+	if err != nil {
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil data event")
+	}
+
+	return helper.Success(c, fiber.StatusOK, "daftar event berhasil diambil", events)
 }
 
 func (s *EventService) Get(c *fiber.Ctx) error {
+	ctx, cancel := helper.RequestContext(c)
+
+	defer cancel()
+
 	rawID := c.Params("id")
 
 	id, err := strconv.Atoi(rawID)
@@ -50,16 +46,24 @@ func (s *EventService) Get(c *fiber.Ctx) error {
 		return helper.Fail(c, fiber.StatusBadRequest, "id harus berupa angka")
 	}
 
-	for _, event := range s.events {
-		if event.ID == id {
-			return helper.Success(c, fiber.StatusOK, "event ditemukan", event)
+	event, err := s.repo.FindByID(ctx, id)
+
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
 		}
+
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil data event")
 	}
 
-	return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
+	return helper.Success(c, fiber.StatusOK, "event ditemukan", event)
 }
 
 func (s *EventService) Create(c *fiber.Ctx) error {
+	ctx, cancel := helper.RequestContext(c)
+
+	defer cancel()
+
 	var req model.CreateEventRequest
 
 	if err := c.BodyParser(&req); err != nil {
@@ -70,18 +74,7 @@ func (s *EventService) Create(c *fiber.Ctx) error {
 		return helper.FailValidation(c, errs)
 	}
 
-	maxID := 0
-
-	for _, event := range s.events {
-		if event.ID > maxID {
-			maxID = event.ID
-		}
-	}
-
-	maxID += 1
-
 	event := model.Event{
-		ID:        maxID,
 		Name:      req.Name,
 		Venue:     req.Venue,
 		EventDate: req.EventDate,
@@ -89,12 +82,20 @@ func (s *EventService) Create(c *fiber.Ctx) error {
 		Quota:     req.Quota,
 	}
 
-	s.events = append(s.events, event)
+	newEvent, err := s.repo.Create(ctx, event)
 
-	return helper.Created(c, "event berhasil dibuat", event, "/api/v1/events/"+strconv.Itoa(event.ID))
+	if err != nil {
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal menyimpan event")
+	}
+
+	return helper.Created(c, "event berhasil dibuat", newEvent, "/api/v1/events/"+strconv.Itoa(newEvent.ID))
 }
 
 func (s *EventService) Replace(c *fiber.Ctx) error {
+	ctx, cancel := helper.RequestContext(c)
+
+	defer cancel()
+
 	rawID := c.Params("id")
 
 	id, err := strconv.Atoi(rawID)
@@ -113,27 +114,33 @@ func (s *EventService) Replace(c *fiber.Ctx) error {
 		return helper.FailValidation(c, errs)
 	}
 
-	for i, event := range s.events {
-		if event.ID == id {
-			newEvent := model.Event{
-				ID:        id,
-				Name:      req.Name,
-				Venue:     req.Venue,
-				EventDate: req.EventDate,
-				Price:     req.Price,
-				Quota:     req.Quota,
-			}
-
-			s.events[i] = newEvent
-
-			return helper.Success(c, fiber.StatusOK, "event berhasil diubah", newEvent)
-		}
+	event := model.Event{
+		ID:        id,
+		Name:      req.Name,
+		Venue:     req.Venue,
+		EventDate: req.EventDate,
+		Price:     req.Price,
+		Quota:     req.Quota,
 	}
 
-	return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
+	newEvent, err := s.repo.Update(ctx, event)
+
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
+		}
+
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal menyimpan event")
+	}
+
+	return helper.Success(c, fiber.StatusOK, "event berhasil diubah", newEvent)
 }
 
 func (s *EventService) Delete(c *fiber.Ctx) error {
+	ctx, cancel := helper.RequestContext(c)
+
+	defer cancel()
+
 	rawID := c.Params("id")
 
 	id, err := strconv.Atoi(rawID)
@@ -142,18 +149,22 @@ func (s *EventService) Delete(c *fiber.Ctx) error {
 		return helper.Fail(c, fiber.StatusBadRequest, "id harus berupa angka")
 	}
 
-	for i, event := range s.events {
-		if event.ID == id {
-			s.events = append(s.events[:i], s.events[i+1:]...)
-
-			return helper.NoContent(c)
+	if err := s.repo.Delete(ctx, id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
 		}
+
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal menghapus event")
 	}
 
-	return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
+	return helper.NoContent(c)
 }
 
 func (s *EventService) Patch(c *fiber.Ctx) error {
+	ctx, cancel := helper.RequestContext(c)
+
+	defer cancel()
+
 	rawID := c.Params("id")
 
 	id, err := strconv.Atoi(rawID)
@@ -172,43 +183,41 @@ func (s *EventService) Patch(c *fiber.Ctx) error {
 		return helper.Fail(c, fiber.StatusBadRequest, "tidak ada field yang diubah")
 	}
 
-	for i, event := range s.events {
-		if event.ID == id {
-			current := s.events[i]
+	event, err := s.repo.FindByID(ctx, id)
 
-			if req.Name != nil {
-				current.Name = *req.Name
-			}
-			if req.Venue != nil {
-				current.Venue = *req.Venue
-			}
-			if req.EventDate != nil {
-				current.EventDate = *req.EventDate
-			}
-			if req.Price != nil {
-				if *req.Price <= 0 {
-					return helper.FailValidation(c, map[string]string{
-						"price": "harga harus lebih dari 0",
-					})
-				}
-
-				current.Price = *req.Price
-			}
-			if req.Quota != nil {
-				if *req.Quota <= 0 {
-					return helper.FailValidation(c, map[string]string{
-						"quota": "kuota harus lebih dari 0",
-					})
-				}
-
-				current.Quota = *req.Quota
-			}
-
-			s.events[i] = current
-
-			return helper.Success(c, fiber.StatusOK, "event berhasil diubah", current)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
 		}
+
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal mengambil event")
 	}
 
-	return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
+	if req.Name != nil {
+		event.Name = *req.Name
+	}
+	if req.Venue != nil {
+		event.Venue = *req.Venue
+	}
+	if req.EventDate != nil {
+		event.EventDate = *req.EventDate
+	}
+	if req.Price != nil {
+		event.Price = *req.Price
+	}
+	if req.Quota != nil {
+		event.Quota = *req.Quota
+	}
+
+	newEvent, err := s.repo.Update(ctx, event)
+
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return helper.Fail(c, fiber.StatusNotFound, "event tidak ditemukan")
+		}
+
+		return helper.Fail(c, fiber.StatusInternalServerError, "gagal menyimpan event")
+	}
+
+	return helper.Success(c, fiber.StatusOK, "event berhasil diubah", newEvent)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"eticket-go/app/repository"
 	"eticket-go/app/service"
 	"eticket-go/config"
 	"eticket-go/database"
@@ -20,7 +21,9 @@ func main() {
 
 	defer pool.Close()
 
-	eventService := service.NewEventService()
+	eventRepository := repository.NewEventRepository(pool)
+
+	eventService := service.NewEventService(eventRepository)
 
 	app := config.NewApp(eventService, pool)
 
